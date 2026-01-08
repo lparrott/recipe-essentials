@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Recipe Essentials">
+  <title>Recipe Essentials - Curated Recipe Aggregator</title>
+  
+  <!-- React and ReactDOM from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      margin: 0;
+      font-family: 'Crimson Pro', Georgia, serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    #root {
+      min-height: 100vh;
+    }
+
+    .recipe-card {
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .recipe-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+
+    .category-button {
+      transition: all 0.2s ease;
+    }
+
+    .category-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .fade-in {
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Pre-populated curated recipes
+    const CURATED_RECIPES = [
+      {
+        title: "Honey Garlic Chicken",
+        sourceUrl: "https://www.recipetineats.com/honey-garlic-chicken/",
+        sourceName: "RecipeTin Eats",
+        servings: "4 servings",
+        time: "12 minutes",
+        category: "Chicken",
+        ingredients: [
+          "500g chicken breast, halved horizontally",
+          "1/4 cup flour",
+          "3.5 tbsp butter",
+          "2 garlic cloves, minced",
+          "1.5 tbsp cider vinegar",
+          "1 tbsp soy sauce",
+          "1/3 cup honey"
+        ],
+        steps: [
+          "Cut chicken breasts in half horizontally. Sprinkle with salt and pepper, then coat in flour.",
+          "Melt most of the butter in a large skillet over high heat. Cook chicken 2-3 minutes until golden, then turn and cook 1 minute more.",
+          "Add remaining butter and garlic to the pan. Stir briefly once butter melts.",
+          "Add vinegar, soy sauce, and honey. Stir to combine and bring to a simmer for 1 minute.",
+          "Turn chicken to coat in sauce. Serve immediately with rice or vegetables."
+        ]
+      },
+      {
+        title: "Sheet Pan Honey Mustard Chicken",
+        sourceUrl: "https://www.budgetbytes.com/sheet-pan-honey-mustard-chicken-and-veggies/",
+        sourceName: "Budget Bytes",
+        servings: "4 servings",
+        time: "35 minutes",
+        category: "Chicken",
+        ingredients: [
+          "1/2 cup mayonnaise",
+          "1 tbsp Dijon mustard",
+          "1 tbsp yellow mustard",
+          "3 tbsp honey",
+          "4 boneless chicken thighs",
+          "3 red potatoes, diced",
+          "1 red onion, diced",
+          "8 oz green beans",
+          "2 carrots, chopped"
+        ],
+        steps: [
+          "Preheat oven to 400°F. Mix mayonnaise, mustards, honey, vinegar, garlic powder, paprika, salt and pepper in a bowl.",
+          "Add chicken thighs to the honey mustard sauce and toss to coat.",
+          "Place potatoes, onions, green beans, and carrots on a sheet pan. Drizzle with oil, season with salt and pepper.",
+          "Place honey mustard chicken on top of vegetables.",
+          "Bake 25-30 minutes until chicken reaches 165°F internal temperature."
+        ]
+      },
+      {
+        title: "Sheet Pan Greek Chicken",
+        sourceUrl: "https://www.budgetbytes.com/sheet-pan-greek-chicken-and-vegetables/",
+        sourceName: "Budget Bytes",
+        servings: "4 servings",
+        time: "35 minutes",
+        category: "Chicken",
+        ingredients: [
+          "1/4 cup olive oil",
+          "1/4 cup lemon juice",
+          "4 garlic cloves, minced",
+          "1/2 tbsp dried oregano",
+          "4 chicken breasts",
+          "2 bell peppers, chopped",
+          "1 red onion, chopped",
+          "1 pint cherry tomatoes"
+        ],
+        steps: [
+          "Preheat oven to 400°F. Combine olive oil, lemon juice, garlic, oregano, salt and pepper.",
+          "Chop peppers and onion into 1-1.5 inch pieces. Add to baking sheet with cherry tomatoes.",
+          "Add half the marinade to vegetables and toss. Roast vegetables for 10 minutes.",
+          "Pound chicken breasts to even thickness. Add remaining marinade and let sit while vegetables roast.",
+          "Add chicken to sheet pan with vegetables. Bake 15-20 minutes until chicken is cooked through."
+        ]
+      },
+      {
+        title: "Easy Sheet Pan Chicken Fajitas",
+        sourceUrl: "https://www.budgetbytes.com/oven-fajitas/",
+        sourceName: "Budget Bytes",
+        servings: "6 servings",
+        time: "40 minutes",
+        category: "Mexican",
+        ingredients: [
+          "1 tbsp chili powder",
+          "1/2 tbsp paprika",
+          "1 tsp cumin",
+          "1 lb chicken breast, sliced",
+          "3 bell peppers, sliced",
+          "2 onions, sliced",
+          "2 tbsp oil",
+          "Tortillas for serving"
+        ],
+        steps: [
+          "Preheat oven to 400°F. Mix chili powder, paprika, onion powder, garlic powder, cumin, cayenne, salt and sugar.",
+          "Slice bell peppers, onions, and chicken into thin strips.",
+          "Place vegetables and chicken on a large sheet pan. Drizzle with oil.",
+          "Sprinkle spice mixture over everything and toss to coat.",
+          "Bake 35-40 minutes, stirring halfway through, until chicken is cooked and vegetables are caramelized."
+        ]
+      },
+      {
+        title: "Sticky Honey Soy Baked Chicken",
+        sourceUrl: "https://www.recipetineats.com/sticky-honey-soy-baked-chicken/",
+        sourceName: "RecipeTin Eats",
+        servings: "4 servings",
+        time: "50 minutes",
+        category: "Chicken",
+        ingredients: [
+          "1/4 cup honey",
+          "1/4 cup soy sauce",
+          "4 garlic cloves, minced",
+          "2 tbsp cider vinegar",
+          "1 tsp sesame oil",
+          "4 chicken thighs or breasts",
+          "1 red onion, cut into wedges"
+        ],
+        steps: [
+          "Preheat oven to 200°C/390°F. Mix honey, soy sauce, garlic, vinegar, sesame oil and pepper.",
+          "Line a pan with foil and baking paper. Spread onion wedges in the pan.",
+          "Place chicken skin side down on onions. Pour sauce over chicken.",
+          "Bake 25 minutes. Turn chicken and baste with pan juices.",
+          "Bake another 20-25 minutes until chicken is cooked through and sauce is sticky."
+        ]
+      },
+      {
+        title: "Sheet Pan Sweet and Sour Chicken",
+        sourceUrl: "https://www.budgetbytes.com/sheet-pan-sweet-sour-chicken/",
+        sourceName: "Budget Bytes",
+        servings: "4 servings",
+        time: "40 minutes",
+        category: "Asian",
+        ingredients: [
+          "1 lb chicken breast, cubed",
+          "1 tsp garlic powder",
+          "1 bell pepper, chopped",
+          "1 onion, chopped",
+          "1 can pineapple chunks",
+          "1/4 cup ketchup",
+          "2 tbsp brown sugar",
+          "2 tbsp rice vinegar"
+        ],
+        steps: [
+          "Preheat oven to 400°F. Cut chicken, bell peppers, and onion into 1-inch pieces.",
+          "Toss chicken with oil, garlic powder, ginger, salt and pepper.",
+          "Spread chicken, vegetables, and drained pineapple on a sheet pan.",
+          "Roast for 20-25 minutes until chicken is cooked through.",
+          "Mix ketchup, brown sugar, vinegar, and reserved pineapple juice. Pour over roasted chicken and vegetables, stir and serve."
+        ]
+      },
+      {
+        title: "One Pan Lemon Garlic Salmon",
+        sourceUrl: "https://damndelicious.net/2019/05/25/one-pan-lemon-garlic-baked-salmon-asparagus/",
+        sourceName: "Damn Delicious",
+        servings: "4 servings",
+        time: "25 minutes",
+        category: "Seafood",
+        ingredients: [
+          "4 salmon fillets",
+          "1 lb asparagus, trimmed",
+          "3 tbsp butter, melted",
+          "3 garlic cloves, minced",
+          "2 tbsp lemon juice",
+          "1 lemon, sliced",
+          "Fresh dill"
+        ],
+        steps: [
+          "Preheat oven to 400°F. Line a baking sheet with foil.",
+          "Place salmon and asparagus on the prepared baking sheet.",
+          "Mix melted butter, garlic, lemon juice, salt and pepper.",
+          "Pour butter mixture over salmon and asparagus. Top with lemon slices.",
+          "Bake 12-15 minutes until salmon is cooked through. Garnish with dill."
+        ]
+      },
+      {
+        title: "Garlic Butter Shrimp Pasta",
+        sourceUrl: "https://damndelicious.net/2018/02/17/garlic-butter-shrimp-pasta/",
+        sourceName: "Damn Delicious",
+        servings: "4 servings",
+        time: "20 minutes",
+        category: "Pasta",
+        ingredients: [
+          "8 oz linguine",
+          "1 lb shrimp, peeled and deveined",
+          "4 tbsp butter",
+          "4 garlic cloves, minced",
+          "1/2 cup white wine",
+          "1/4 cup parsley, chopped",
+          "Parmesan cheese"
+        ],
+        steps: [
+          "Cook linguine according to package directions. Reserve 1/2 cup pasta water.",
+          "Melt 2 tbsp butter in a large skillet. Add shrimp and cook 2-3 minutes per side.",
+          "Remove shrimp and set aside. Add remaining butter and garlic to skillet.",
+          "Add white wine and pasta water. Simmer for 2 minutes.",
+          "Add cooked pasta and shrimp back to skillet. Toss to coat. Top with parsley and Parmesan."
+        ]
+      },
+      {
+        title: "Crispy Parmesan Garlic Chicken",
+        sourceUrl: "https://damndelicious.net/2014/11/15/crispy-garlic-parmesan-chicken-strips/",
+        sourceName: "Damn Delicious",
+        servings: "4 servings",
+        time: "30 minutes",
+        category: "Chicken",
+        ingredients: [
+          "1 lb chicken tenders",
+          "1 cup panko breadcrumbs",
+          "1/2 cup Parmesan cheese, grated",
+          "4 garlic cloves, minced",
+          "1/2 cup flour",
+          "2 eggs, beaten",
+          "2 tbsp butter, melted"
+        ],
+        steps: [
+          "Preheat oven to 400°F. Line a baking sheet with parchment paper.",
+          "Mix panko, Parmesan, garlic, salt and pepper in a bowl.",
+          "Dredge chicken in flour, dip in beaten eggs, then coat in panko mixture.",
+          "Place on baking sheet and drizzle with melted butter.",
+          "Bake 20-25 minutes until golden brown and cooked through."
+        ]
+      },
+      {
+        title: "Marcella Hazan's Tomato Sauce",
+        sourceUrl: "https://food52.com/recipes/13722-marcella-hazan-s-tomato-sauce-with-onion-and-butter",
+        sourceName: "Food52",
+        servings: "4 servings",
+        time: "45 minutes",
+        category: "Pasta",
+        ingredients: [
+          "2 cups canned tomatoes, crushed",
+          "5 tbsp butter",
+          "1 onion, peeled and cut in half",
+          "Salt to taste",
+          "Pasta of choice"
+        ],
+        steps: [
+          "Combine tomatoes, butter, onion halves, and salt in a saucepan.",
+          "Bring to a simmer over medium heat.",
+          "Cook uncovered for about 45 minutes, stirring occasionally.",
+          "Remove and discard onion halves.",
+          "Toss with cooked pasta and serve immediately."
+        ]
+      },
+      {
+        title: "West African Peanut Stew",
+        sourceUrl: "https://food52.com/recipes/87231-west-african-peanut-stew-recipe",
+        sourceName: "Food52",
+        servings: "6 servings",
+        time: "45 minutes",
+        category: "Soup",
+        ingredients: [
+          "1 onion, diced",
+          "3 garlic cloves, minced",
+          "1 tbsp ginger, minced",
+          "1 can diced tomatoes",
+          "1/2 cup peanut butter",
+          "4 cups vegetable broth",
+          "1 sweet potato, cubed",
+          "1 bunch kale, chopped"
+        ],
+        steps: [
+          "Sauté onion in oil until softened. Add garlic and ginger, cook 1 minute.",
+          "Add tomatoes and cook for 5 minutes.",
+          "Stir in peanut butter until melted and combined.",
+          "Add broth, sweet potato, and seasonings. Simmer 15-20 minutes until potato is tender.",
+          "Add kale and cook until wilted. Serve over rice."
+        ]
+      },
+      {
+        title: "Cacio e Pepe",
+        sourceUrl: "https://www.seriouseats.com/cacio-e-pepe-recipe",
+        sourceName: "Serious Eats",
+        servings: "2 servings",
+        time: "15 minutes",
+        category: "Pasta",
+        ingredients: [
+          "8 oz spaghetti",
+          "2 tsp black pepper, coarsely ground",
+          "6 tbsp butter",
+          "1 cup Pecorino Romano, finely grated",
+          "Salt to taste"
+        ],
+        steps: [
+          "Cook spaghetti in salted water until al dente. Reserve 1 cup pasta water.",
+          "Toast black pepper in a large skillet over medium heat until fragrant.",
+          "Add butter and 1/2 cup pasta water to skillet. Stir until butter melts.",
+          "Add drained pasta and toss to coat.",
+          "Remove from heat. Add Pecorino and toss vigorously, adding pasta water as needed to create a creamy sauce."
+        ]
+      }
+    ];
+
+    const CATEGORIES = ['All', 'Chicken', 'Pasta', 'Seafood', 'Asian', 'Mexican', 'Soup', 'Vegetarian', 'Dessert', 'Other'];
+
+    function RecipeAggregator() {
+      const [selectedRecipe, setSelectedRecipe] = useState(null);
+      const [savedRecipes, setSavedRecipes] = useState([]);
+      const [userRecipes, setUserRecipes] = useState([]);
+      const [selectedCategory, setSelectedCategory] = useState('All');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [view, setView] = useState('browse');
+      const [url, setUrl] = useState('');
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      // Check URL parameters on mount
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const urlParam = params.get('url');
+        if (urlParam) {
+          setUrl(decodeURIComponent(urlParam));
+          setView('add');
+          // Auto-extract if URL is provided
+          setTimeout(() => {
+            fetchRecipe(decodeURIComponent(urlParam));
+          }, 500);
+        }
+      }, []);
+
+      // Load saved recipes and user-added recipes from localStorage
+      useEffect(() => {
+        const saved = localStorage.getItem('savedRecipes');
+        if (saved) {
+          setSavedRecipes(JSON.parse(saved));
+        }
+        const userAdded = localStorage.getItem('userRecipes');
+        if (userAdded) {
+          setUserRecipes(JSON.parse(userAdded));
+        }
+      }, []);
+
+      // Fetch and extract recipe from URL
+      const fetchRecipe = async (recipeUrl) => {
+        setLoading(true);
+        setError('');
+
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 4000,
+              tools: [{
+                type: "web_search_20250305",
+                name: "web_search"
+              }],
+              messages: [{
+                role: 'user',
+                content: `Please use your web search tools to fetch and read the complete content from this URL: ${recipeUrl}
+
+After you have fetched and read the webpage, extract the recipe information and return ONLY a valid JSON object. Do not include any markdown formatting, no code blocks, no explanatory text before or after - ONLY the raw JSON object.
+
+Return this exact structure:
+{
+  "title": "recipe title",
+  "sourceUrl": "${recipeUrl}",
+  "sourceName": "website name (e.g., 'Serious Eats', 'Budget Bytes')",
+  "servings": "number of servings (e.g., '4 servings')",
+  "time": "total time (e.g., '30 minutes', '1 hour')",
+  "category": "ONE of these: Chicken, Pasta, Seafood, Asian, Mexican, Soup, Vegetarian, Dessert, or Other",
+  "ingredients": ["brief ingredient 1", "brief ingredient 2", "..."],
+  "steps": ["brief step 1", "brief step 2", "..."]
+}
+
+CRITICAL RULES:
+1. First fetch the URL to get the recipe content
+2. Extract ONLY brief snippets - keep ingredients under 10 words, steps 1-2 sentences max
+3. Return ONLY the JSON object - no preamble, no markdown code blocks, no explanation
+4. If you cannot access the URL or extract the recipe, return: {"error": "Could not extract recipe from this URL"}
+
+Start by fetching the URL, then return ONLY the JSON object:`
+              }]
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch recipe');
+          }
+
+          const data = await response.json();
+          
+          console.log('API Response:', data);
+          
+          // Extract text from response (filter out tool use blocks)
+          const text = data.content
+            .filter(item => item.type === 'text')
+            .map(item => item.text)
+            .join('\n');
+
+          console.log('Extracted text:', text);
+
+          // Try to find and parse JSON with multiple strategies
+          let recipeData;
+          let parseAttempts = [
+            // Strategy 1: Remove markdown and parse
+            () => {
+              const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+              return JSON.parse(cleanText);
+            },
+            // Strategy 2: Find JSON object with regex
+            () => {
+              const jsonMatch = text.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                return JSON.parse(jsonMatch[0]);
+              }
+              throw new Error('No JSON found');
+            },
+            // Strategy 3: Find JSON between curly braces (greedy)
+            () => {
+              const firstBrace = text.indexOf('{');
+              const lastBrace = text.lastIndexOf('}');
+              if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                return JSON.parse(text.substring(firstBrace, lastBrace + 1));
+              }
+              throw new Error('No JSON found');
+            }
+          ];
+
+          for (let attempt of parseAttempts) {
+            try {
+              recipeData = attempt();
+              break;
+            } catch (e) {
+              continue;
+            }
+          }
+
+          if (!recipeData) {
+            const preview = text.substring(0, 200);
+            console.error('Failed to parse response:', text);
+            throw new Error(`Could not parse recipe data. Response preview: "${preview}..."`);
+          }
+          
+          if (recipeData.error) {
+            throw new Error(recipeData.error);
+          }
+
+          // Validate required fields
+          if (!recipeData.title || !recipeData.ingredients || !recipeData.steps) {
+            throw new Error('Recipe is missing required information (title, ingredients, or steps).');
+          }
+
+          // Add to user recipes
+          const newUserRecipes = [...userRecipes, { ...recipeData, addedAt: Date.now() }];
+          setUserRecipes(newUserRecipes);
+          localStorage.setItem('userRecipes', JSON.stringify(newUserRecipes));
+
+          // Show the recipe
+          setSelectedRecipe(recipeData);
+          setView('browse');
+          setUrl('');
+          
+        } catch (err) {
+          console.error('Recipe fetch error:', err);
+          let errorMessage = err.message || 'Failed to fetch recipe. Please check the URL and try again.';
+          
+          // Provide more helpful error messages based on error type
+          if (errorMessage.includes('Could not extract recipe from this URL')) {
+            errorMessage = '⚠️ Could not extract recipe from this URL. This may mean:\n\n• The site blocks automated access (common for Serious Eats, NYT Cooking, etc.)\n• The page doesn\'t contain a recipe in a recognizable format\n• The recipe structure is unusual\n\n✅ Try recipes from: RecipeTin Eats, Budget Bytes, Damn Delicious, Food52, AllRecipes, or most other food blogs.';
+          } else if (errorMessage.includes('Could not parse')) {
+            errorMessage += '\n\nThe website may have an unusual format. Try a recipe from RecipeTin Eats, Budget Bytes, or Damn Delicious.';
+          } else if (errorMessage.includes('Failed to fetch')) {
+            errorMessage = 'Could not access the website. The site may be down or blocking automated access. Try a different recipe URL.';
+          }
+          
+          setError(errorMessage);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      // Save recipe to localStorage
+      const saveRecipe = (recipeData) => {
+        const alreadySaved = savedRecipes.some(r => r.sourceUrl === recipeData.sourceUrl);
+        if (alreadySaved) {
+          alert('Recipe already saved!');
+          return;
+        }
+        const newSaved = [...savedRecipes, { ...recipeData, savedAt: Date.now() }];
+        setSavedRecipes(newSaved);
+        localStorage.setItem('savedRecipes', JSON.stringify(newSaved));
+      };
+
+      // Delete saved recipe
+      const deleteRecipe = (index) => {
+        const newSaved = savedRecipes.filter((_, i) => i !== index);
+        setSavedRecipes(newSaved);
+        localStorage.setItem('savedRecipes', JSON.stringify(newSaved));
+      };
+
+      // Delete user-added recipe
+      const deleteUserRecipe = (index) => {
+        const newUserRecipes = userRecipes.filter((_, i) => i !== index);
+        setUserRecipes(newUserRecipes);
+        localStorage.setItem('userRecipes', JSON.stringify(newUserRecipes));
+      };
+
+      // Combine curated and user recipes
+      const allRecipes = [...CURATED_RECIPES, ...userRecipes];
+
+      // Filter recipes
+      const filteredRecipes = allRecipes.filter(recipe => {
+        const matchesCategory = selectedCategory === 'All' || recipe.category === selectedCategory;
+        const matchesSearch = recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             recipe.sourceName.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCategory && matchesSearch;
+      });
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #fdfbf7 0%, #f5f1e8 100%)',
+          fontFamily: "'Crimson Pro', Georgia, serif",
+        }}>
+          {/* Header */}
+          <header style={{
+            background: 'linear-gradient(to bottom, #2c1810, #3d2415)',
+            color: '#fdfbf7',
+            padding: '2rem 1.5rem',
+            textAlign: 'center',
+            borderBottom: '3px solid #d4a574',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+          }}>
+            <h1 style={{
+              margin: '0 0 0.5rem 0',
+              fontSize: '2.5rem',
+              fontWeight: '600',
+              letterSpacing: '0.5px'
+            }}>
+              Recipe Essentials
+            </h1>
+            <p style={{
+              margin: 0,
+              fontSize: '1rem',
+              opacity: 0.9,
+              fontFamily: "'Work Sans', sans-serif"
+            }}>
+              Curated recipes from the web's best food blogs
+            </p>
+          </header>
+
+          {/* Navigation */}
+          <div style={{
+            background: 'white',
+            borderBottom: '1px solid #e8e3d8',
+            padding: '1rem 1.5rem',
+            display: 'flex',
+            gap: '1rem',
+            justifyContent: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <button
+              onClick={() => setView('browse')}
+              style={{
+                padding: '0.625rem 1.5rem',
+                background: view === 'browse' ? 'linear-gradient(135deg, #2c1810 0%, #3d2415 100%)' : 'white',
+                color: view === 'browse' ? 'white' : '#2c1810',
+                border: `2px solid ${view === 'browse' ? '#2c1810' : '#e8e3d8'}`,
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                fontFamily: "'Work Sans', sans-serif",
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📚 Browse ({allRecipes.length})
+            </button>
+            <button
+              onClick={() => setView('add')}
+              style={{
+                padding: '0.625rem 1.5rem',
+                background: view === 'add' ? 'linear-gradient(135deg, #d4a574 0%, #b8935f 100%)' : 'white',
+                color: view === 'add' ? 'white' : '#2c1810',
+                border: `2px solid ${view === 'add' ? '#d4a574' : '#e8e3d8'}`,
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                fontFamily: "'Work Sans', sans-serif",
+                transition: 'all 0.2s ease'
+              }}
+            >
+              ➕ Add Recipe
+            </button>
+            <button
+              onClick={() => setView('saved')}
+              style={{
+                padding: '0.625rem 1.5rem',
+                background: view === 'saved' ? 'linear-gradient(135deg, #2c1810 0%, #3d2415 100%)' : 'white',
+                color: view === 'saved' ? 'white' : '#2c1810',
+                border: `2px solid ${view === 'saved' ? '#2c1810' : '#e8e3d8'}`,
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                fontFamily: "'Work Sans', sans-serif",
+                transition: 'all 0.2s ease'
+              }}
+            >
+              💾 Saved ({savedRecipes.length})
+            </button>
+          </div>
+
+          <main style={{
+            maxWidth: '1200px',
+            margin: '0 auto',
+            padding: '2rem 1.5rem'
+          }}>
+            {view === 'browse' && !selectedRecipe && (
+              <>
+                {/* Search and Filter */}
+                <div style={{
+                  background: 'white',
+                  padding: '1.5rem',
+                  borderRadius: '12px',
+                  marginBottom: '2rem',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                  border: '1px solid #e8e3d8'
+                }}>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search recipes..."
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem 1rem',
+                      border: '2px solid #e8e3d8',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontFamily: "'Work Sans', sans-serif",
+                      marginBottom: '1rem'
+                    }}
+                  />
+                  
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    flexWrap: 'wrap'
+                  }}>
+                    {CATEGORIES.map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className="category-button"
+                        style={{
+                          padding: '0.5rem 1rem',
+                          background: selectedCategory === cat ? 'linear-gradient(135deg, #d4a574 0%, #b8935f 100%)' : '#f5f1e8',
+                          color: selectedCategory === cat ? 'white' : '#2c1810',
+                          border: 'none',
+                          borderRadius: '20px',
+                          fontSize: '0.9rem',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          fontFamily: "'Work Sans', sans-serif"
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recipe Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                  gap: '1.5rem'
+                }}>
+                  {filteredRecipes.map((recipe, idx) => {
+                    const isCurated = CURATED_RECIPES.some(r => r.sourceUrl === recipe.sourceUrl);
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => setSelectedRecipe(recipe)}
+                        className="recipe-card fade-in"
+                        style={{
+                          background: 'white',
+                          padding: '1.5rem',
+                          borderRadius: '12px',
+                          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                          border: '1px solid #e8e3d8',
+                          animationDelay: `${idx * 0.05}s`,
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                          flexWrap: 'wrap'
+                        }}>
+                          <div style={{
+                            display: 'inline-block',
+                            padding: '0.25rem 0.75rem',
+                            background: '#fdfbf7',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            color: '#d4a574',
+                            fontFamily: "'Work Sans', sans-serif"
+                          }}>
+                            {recipe.category}
+                          </div>
+                          {isCurated && (
+                            <div style={{
+                              display: 'inline-block',
+                              padding: '0.25rem 0.75rem',
+                              background: 'linear-gradient(135deg, #d4a574 0%, #b8935f 100%)',
+                              borderRadius: '12px',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              color: 'white',
+                              fontFamily: "'Work Sans', sans-serif"
+                            }}>
+                              ⭐ Featured
+                            </div>
+                          )}
+                        </div>
+                        
+                        <h3 style={{
+                          margin: '0 0 0.5rem 0',
+                          fontSize: '1.35rem',
+                          fontWeight: '600',
+                          color: '#2c1810',
+                          lineHeight: '1.3'
+                        }}>
+                          {recipe.title}
+                        </h3>
+                        
+                        <p style={{
+                          margin: '0 0 0.75rem 0',
+                          fontSize: '0.9rem',
+                          color: '#666',
+                          fontFamily: "'Work Sans', sans-serif"
+                        }}>
+                          {recipe.sourceName}
+                        </p>
+                        
+                        <div style={{
+                          display: 'flex',
+                          gap: '1rem',
+                          fontSize: '0.85rem',
+                          color: '#999',
+                          fontFamily: "'Work Sans', sans-serif"
+                        }}>
+                          <span>⏱️ {recipe.time}</span>
+                          <span>🍽️ {recipe.servings}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {view === 'saved' && (
+              <div style={{
+                background: 'white',
+                padding: '2rem',
+                borderRadius: '12px',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                border: '1px solid #e8e3d8'
+              }}>
+                <h2 style={{
+                  margin: '0 0 1.5rem 0',
+                  fontSize: '1.75rem',
+                  color: '#2c1810',
+                  fontWeight: '600'
+                }}>
+                  Saved Recipes (Available Offline)
+                </h2>
+                
+                {savedRecipes.length === 0 ? (
+                  <p style={{
+                    color: '#666',
+                    fontSize: '1rem',
+                    fontFamily: "'Work Sans', sans-serif"
+                  }}>
+                    No saved recipes yet. Browse recipes and save your favorites for offline access!
+                  </p>
+                ) : (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '1rem'
+                  }}>
+                    {savedRecipes.map((saved, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: '1.25rem',
+                          background: '#fdfbf7',
+                          borderRadius: '8px',
+                          border: '1px solid #e8e3d8',
+                          position: 'relative'
+                        }}
+                      >
+                        <div
+                          onClick={() => setSelectedRecipe(saved)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <h4 style={{
+                            margin: '0 0 0.5rem 0',
+                            fontSize: '1.1rem',
+                            color: '#2c1810',
+                            fontWeight: '600',
+                            paddingRight: '2rem'
+                          }}>
+                            {saved.title}
+                          </h4>
+                          <p style={{
+                            margin: 0,
+                            fontSize: '0.85rem',
+                            color: '#666',
+                            fontFamily: "'Work Sans', sans-serif"
+                          }}>
+                            {saved.sourceName}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('Delete this saved recipe?')) {
+                              deleteRecipe(idx);
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '1rem',
+                            right: '1rem',
+                            padding: '0.375rem 0.625rem',
+                            background: 'white',
+                            border: '1px solid #ddd',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontFamily: "'Work Sans', sans-serif"
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {view === 'add' && (
+              <div>
+                {/* URL Input */}
+                <div style={{
+                  background: 'white',
+                  padding: '2rem',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                  border: '1px solid #e8e3d8',
+                  marginBottom: '2rem'
+                }}>
+                  <h2 style={{
+                    margin: '0 0 1rem 0',
+                    fontSize: '1.75rem',
+                    color: '#2c1810',
+                    fontWeight: '600'
+                  }}>
+                    Add Recipe from URL
+                  </h2>
+                  <p style={{
+                    margin: '0 0 1.5rem 0',
+                    fontSize: '1rem',
+                    color: '#666',
+                    fontFamily: "'Work Sans', sans-serif"
+                  }}>
+                    Paste a recipe URL from any website. Claude will fetch the page and extract the ingredients and steps for you. This may take 10-20 seconds.
+                  </p>
+
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.75rem',
+                    flexWrap: 'wrap',
+                    marginBottom: '1rem'
+                  }}>
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="https://www.recipetineats.com/..."
+                      disabled={loading}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && url.trim()) {
+                          fetchRecipe(url);
+                        }
+                      }}
+                      style={{
+                        flex: '1',
+                        minWidth: '250px',
+                        padding: '0.875rem 1rem',
+                        border: '2px solid #e8e3d8',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontFamily: "'Work Sans', sans-serif",
+                        transition: 'border-color 0.2s ease'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#d4a574'}
+                      onBlur={(e) => e.target.style.borderColor = '#e8e3d8'}
+                    />
+                    <button
+                      onClick={() => {
+                        if (url.trim()) {
+                          fetchRecipe(url);
+                        }
+                      }}
+                      disabled={loading || !url.trim()}
+                      style={{
+                        padding: '0.875rem 2rem',
+                        background: (loading || !url.trim()) ? '#9a8f82' : 'linear-gradient(135deg, #d4a574 0%, #b8935f 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        fontWeight: '500',
+                        cursor: (loading || !url.trim()) ? 'not-allowed' : 'pointer',
+                        fontFamily: "'Work Sans', sans-serif",
+                        boxShadow: '0 2px 8px rgba(212, 165, 116, 0.3)'
+                      }}
+                    >
+                      {loading ? 'Extracting...' : 'Extract Recipe'}
+                    </button>
+                  </div>
+
+                  {error && (
+                    <div style={{
+                      padding: '1rem',
+                      background: '#fee',
+                      border: '1px solid #fcc',
+                      borderRadius: '8px',
+                      color: '#c33',
+                      marginTop: '1rem',
+                      fontFamily: "'Work Sans', sans-serif",
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      fontSize: '0.9rem',
+                      lineHeight: '1.6',
+                      whiteSpace: 'pre-line'
+                    }}>
+                      {error}
+                    </div>
+                  )}
+
+                  <div style={{
+                    marginTop: '1.5rem',
+                    padding: '1rem',
+                    background: '#fdfbf7',
+                    borderRadius: '8px',
+                    border: '1px solid #e8e3d8',
+                    fontSize: '0.9rem',
+                    color: '#666',
+                    fontFamily: "'Work Sans', sans-serif",
+                    lineHeight: '1.6'
+                  }}>
+                    <strong style={{ color: '#2c1810' }}>✅ Works well with:</strong> RecipeTin Eats, Budget Bytes, Damn Delicious, Food52, AllRecipes, Sally's Baking Addiction, Minimalist Baker, and most food blogs.
+                    <br/><br/>
+                    <strong style={{ color: '#c33' }}>❌ May not work:</strong> Some sites like Serious Eats, NYT Cooking, Bon Appétit block automated access for copyright protection.
+                  </div>
+                </div>
+
+                {/* Your Added Recipes */}
+                {userRecipes.length > 0 && (
+                  <div style={{
+                    background: 'white',
+                    padding: '2rem',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                    border: '1px solid #e8e3d8'
+                  }}>
+                    <h3 style={{
+                      margin: '0 0 1rem 0',
+                      fontSize: '1.5rem',
+                      color: '#2c1810',
+                      fontWeight: '600'
+                    }}>
+                      Your Added Recipes ({userRecipes.length})
+                    </h3>
+                    
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                      gap: '1rem'
+                    }}>
+                      {userRecipes.map((recipe, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '1.25rem',
+                            background: '#fdfbf7',
+                            borderRadius: '8px',
+                            border: '1px solid #e8e3d8',
+                            position: 'relative'
+                          }}
+                        >
+                          <div
+                            onClick={() => {
+                              setSelectedRecipe(recipe);
+                              setView('browse');
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <h4 style={{
+                              margin: '0 0 0.5rem 0',
+                              fontSize: '1.1rem',
+                              color: '#2c1810',
+                              fontWeight: '600',
+                              paddingRight: '2rem'
+                            }}>
+                              {recipe.title}
+                            </h4>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '0.85rem',
+                              color: '#666',
+                              fontFamily: "'Work Sans', sans-serif"
+                            }}>
+                              {recipe.sourceName}
+                            </p>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('Delete this recipe?')) {
+                                deleteUserRecipe(idx);
+                              }
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: '1rem',
+                              right: '1rem',
+                              padding: '0.375rem 0.625rem',
+                              background: 'white',
+                              border: '1px solid #ddd',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontFamily: "'Work Sans', sans-serif"
+                            }}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Recipe Detail View */}
+            {selectedRecipe && (
+              <div className="fade-in">
+                <button
+                  onClick={() => setSelectedRecipe(null)}
+                  style={{
+                    padding: '0.625rem 1.25rem',
+                    background: 'white',
+                    color: '#2c1810',
+                    border: '2px solid #e8e3d8',
+                    borderRadius: '8px',
+                    fontSize: '0.95rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    fontFamily: "'Work Sans', sans-serif",
+                    marginBottom: '1.5rem'
+                  }}
+                >
+                  ← Back to {view === 'browse' ? 'Browse' : 'Saved'}
+                </button>
+
+                <div style={{
+                  background: 'white',
+                  padding: '2.5rem',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                  border: '1px solid #e8e3d8'
+                }}>
+                  <div style={{ marginBottom: '2rem', borderBottom: '2px solid #e8e3d8', paddingBottom: '1.5rem' }}>
+                    <h2 style={{
+                      margin: '0 0 1rem 0',
+                      fontSize: '2.25rem',
+                      fontWeight: '600',
+                      color: '#2c1810',
+                      lineHeight: '1.2'
+                    }}>
+                      {selectedRecipe.title}
+                    </h2>
+                    
+                    <div style={{
+                      display: 'flex',
+                      gap: '1.5rem',
+                      flexWrap: 'wrap',
+                      marginBottom: '1rem',
+                      fontFamily: "'Work Sans', sans-serif",
+                      fontSize: '0.95rem',
+                      color: '#666'
+                    }}>
+                      {selectedRecipe.servings && <div>🍽️ {selectedRecipe.servings}</div>}
+                      {selectedRecipe.time && <div>⏱️ {selectedRecipe.time}</div>}
+                    </div>
+
+                    <div style={{
+                      fontSize: '0.9rem',
+                      color: '#666',
+                      fontFamily: "'Work Sans', sans-serif",
+                      marginBottom: '1rem'
+                    }}>
+                      <span style={{ opacity: 0.7 }}>Recipe from </span>
+                      <a 
+                        href={selectedRecipe.sourceUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                          color: '#d4a574',
+                          textDecoration: 'none',
+                          fontWeight: '500',
+                          borderBottom: '1px solid #d4a574'
+                        }}
+                      >
+                        {selectedRecipe.sourceName}
+                      </a>
+                    </div>
+
+                    <button
+                      onClick={() => saveRecipe(selectedRecipe)}
+                      style={{
+                        padding: '0.625rem 1.25rem',
+                        background: 'linear-gradient(135deg, #d4a574 0%, #b8935f 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '0.9rem',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        fontFamily: "'Work Sans', sans-serif",
+                        boxShadow: '0 2px 8px rgba(212, 165, 116, 0.3)'
+                      }}
+                    >
+                      💾 Save for Offline
+                    </button>
+                  </div>
+
+                  <section style={{ marginBottom: '2.5rem' }}>
+                    <h3 style={{
+                      margin: '0 0 1.25rem 0',
+                      fontSize: '1.5rem',
+                      fontWeight: '600',
+                      color: '#2c1810'
+                    }}>
+                      Ingredients
+                    </h3>
+                    <ul style={{
+                      margin: 0,
+                      padding: '0 0 0 1.25rem',
+                      listStyle: 'none'
+                    }}>
+                      {selectedRecipe.ingredients.map((ingredient, idx) => (
+                        <li 
+                          key={idx}
+                          style={{
+                            padding: '0.625rem 0',
+                            fontSize: '1.05rem',
+                            lineHeight: '1.6',
+                            color: '#2c1810',
+                            fontFamily: "'Work Sans', sans-serif",
+                            position: 'relative',
+                            paddingLeft: '1.5rem'
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute',
+                            left: 0,
+                            color: '#d4a574',
+                            fontWeight: '600'
+                          }}>•</span>
+                          {ingredient}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+
+                  <section>
+                    <h3 style={{
+                      margin: '0 0 1.25rem 0',
+                      fontSize: '1.5rem',
+                      fontWeight: '600',
+                      color: '#2c1810'
+                    }}>
+                      Steps
+                    </h3>
+                    <ol style={{
+                      margin: 0,
+                      padding: '0 0 0 1.5rem',
+                      counterReset: 'step'
+                    }}>
+                      {selectedRecipe.steps.map((step, idx) => (
+                        <li 
+                          key={idx}
+                          style={{
+                            padding: '1rem 0',
+                            fontSize: '1.05rem',
+                            lineHeight: '1.7',
+                            color: '#2c1810',
+                            fontFamily: "'Work Sans', sans-serif",
+                            borderBottom: idx < selectedRecipe.steps.length - 1 ? '1px solid #f5f1e8' : 'none',
+                            listStyleType: 'none',
+                            counterIncrement: 'step',
+                            position: 'relative',
+                            paddingLeft: '2.5rem'
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: '1rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '1.75rem',
+                            height: '1.75rem',
+                            background: 'linear-gradient(135deg, #d4a574 0%, #b8935f 100%)',
+                            color: 'white',
+                            borderRadius: '50%',
+                            fontSize: '0.85rem',
+                            fontWeight: '600'
+                          }}>
+                            {idx + 1}
+                          </span>
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+
+                  <div style={{
+                    marginTop: '2.5rem',
+                    padding: '1.25rem',
+                    background: '#fdfbf7',
+                    borderRadius: '8px',
+                    border: '1px solid #e8e3d8',
+                    fontSize: '0.875rem',
+                    color: '#666',
+                    lineHeight: '1.6',
+                    fontFamily: "'Work Sans', sans-serif"
+                  }}>
+                    <strong style={{ color: '#2c1810' }}>Note:</strong> This is a snippet for reference only. 
+                    Please visit the{' '}
+                    <a 
+                      href={selectedRecipe.sourceUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ color: '#d4a574', textDecoration: 'none', borderBottom: '1px solid #d4a574' }}
+                    >
+                      original recipe page
+                    </a>
+                    {' '}for the full recipe, photos, tips, and to support the recipe creator.
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+
+          <footer style={{
+            textAlign: 'center',
+            padding: '2rem 1.5rem',
+            fontSize: '0.875rem',
+            color: '#999',
+            fontFamily: "'Work Sans', sans-serif"
+          }}>
+            <p style={{ margin: '0 0 0.5rem 0' }}>
+              Recipe Essentials features curated recipes and lets you add your own from any website.
+            </p>
+            <p style={{ margin: '0 0 0.5rem 0' }}>
+              We provide snippets only and always link to the source to support recipe creators.
+            </p>
+            <p style={{ margin: 0 }}>
+              Featured recipes from RecipeTin Eats • Budget Bytes • Damn Delicious • Food52 • Serious Eats
+            </p>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<RecipeAggregator />, document.getElementById('root'));
+  </script>
+</body>
+</html>
