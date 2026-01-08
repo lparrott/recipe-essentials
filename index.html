@@ -70,8 +70,12 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // CORS proxy for fetching recipes
-    const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+    // Multiple CORS proxies for fetching recipes (with fallbacks)
+    const CORS_PROXIES = [
+      'https://api.allorigins.win/raw?url=',
+      'https://corsproxy.io/?',
+      'https://api.codetabs.com/v1/proxy?quest='
+    ];
 
     // Recipe extraction functions
     const extractRecipeFromHTML = (html, url) => {
@@ -457,15 +461,52 @@
         try {
           console.log('Fetching recipe from:', recipeUrl);
           
-          // Fetch the page HTML through CORS proxy
-          const response = await fetch(CORS_PROXY + encodeURIComponent(recipeUrl));
+          let html = null;
+          let lastError = null;
           
-          if (!response.ok) {
-            throw new Error('Failed to fetch the webpage. The site may be down or blocking access.');
-          }
+          // Try each CORS proxy until one works
+          for (let i = 0; i < CORS_PROXIES.length; i++) {
+            const proxy = CORS_PROXIES[i];
+            const proxyUrl = proxy + encodeURIComponent(recipeUrl);
+            
+            try {
+              console.log(`Trying proxy ${i + 1}/${CORS_PROXIES.length}:`, proxy);
+              
+              const response = await fetch(proxyUrl, {
+                method: 'GET',
+                headers: {
+                  'Accept': 'text/html,application/xhtml+xml,application/xml'
+                }
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
 
-          const html = await response.text();
-          console.log('Received HTML, length:', html.length);
+              html = await response.text();
+              
+              if (html && html.length > 100) {
+                console.log('Successfully fetched HTML, length:', html.length);
+                break; // Success! Exit the loop
+              } else {
+                throw new Error('Received empty or invalid response');
+              }
+              
+            } catch (proxyError) {
+              console.warn(`Proxy ${i + 1} failed:`, proxyError.message);
+              lastError = proxyError;
+              
+              // If this isn't the last proxy, continue to next one
+              if (i < CORS_PROXIES.length - 1) {
+                continue;
+              }
+            }
+          }
+          
+          // If we still don't have HTML, all proxies failed
+          if (!html) {
+            throw new Error(`All proxies failed. Last error: ${lastError?.message || 'Unknown error'}. The website may be blocking automated access.`);
+          }
           
           // Extract recipe from HTML
           const recipeData = extractRecipeFromHTML(html, recipeUrl);
@@ -491,6 +532,8 @@
           
           if (errorMessage.includes('Could not find recipe data')) {
             errorMessage = '⚠️ Could not find recipe data on this page.\n\nThis could mean:\n• The page doesn\'t have structured recipe data\n• The recipe format is unusual\n• The page is not a recipe\n\n✅ Works best with: RecipeTin Eats, Budget Bytes, AllRecipes, Food Network, Bon Appétit, and most modern recipe blogs.';
+          } else if (errorMessage.includes('All proxies failed') || errorMessage.includes('Failed to fetch')) {
+            errorMessage = '⚠️ Unable to fetch the recipe page.\n\nThis could mean:\n• The website is blocking automated access\n• Your internet connection is unstable\n• The CORS proxies are temporarily unavailable\n\n💡 Try:\n• Refreshing the page and trying again\n• Trying a different recipe from the same site\n• Checking your internet connection\n• Using a recipe from a different website';
           }
           
           setError(errorMessage);
@@ -990,11 +1033,11 @@
                     fontFamily: "'Work Sans', sans-serif",
                     lineHeight: '1.6'
                   }}>
-                    <strong style={{ color: '#2c1810' }}>✅ How it works:</strong> We extract recipes using structured data (JSON-LD/Schema.org) that most recipe sites include. No AI, no API costs, instant results!
+                    <strong style={{ color: '#2c1810' }}>✅ How it works:</strong> We extract recipes using structured data (JSON-LD/Schema.org) that most recipe sites include. The app automatically tries multiple CORS proxies to fetch the page - no AI, no API costs, instant results!
                     <br/><br/>
                     <strong style={{ color: '#2c1810' }}>✅ Works with:</strong> RecipeTin Eats, Budget Bytes, AllRecipes, Food Network, Bon Appétit, Serious Eats, and 99% of modern recipe blogs.
                     <br/><br/>
-                    <strong style={{ color: '#2c1810' }}>🔒 Privacy:</strong> Everything happens in your browser. No data is sent to any servers.
+                    <strong style={{ color: '#2c1810' }}>🔒 Privacy:</strong> Everything happens in your browser. No data is sent to any servers (except the public webpage you're extracting).
                   </div>
                 </div>
 
