@@ -70,7 +70,198 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // Pre-populated curated recipes
+    // CORS proxy for fetching recipes
+    const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+
+    // Recipe extraction functions
+    const extractRecipeFromHTML = (html, url) => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Try to find JSON-LD recipe schema (most modern recipe sites use this)
+      const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
+      
+      for (let script of scripts) {
+        try {
+          const data = JSON.parse(script.textContent);
+          
+          // Handle both single recipe and array of recipes
+          const recipes = Array.isArray(data) ? data : [data];
+          
+          for (let item of recipes) {
+            // Look for Recipe schema (could be nested in @graph)
+            const recipe = item['@type'] === 'Recipe' ? item : 
+                          item['@graph']?.find(g => g['@type'] === 'Recipe');
+            
+            if (recipe) {
+              return parseRecipeSchema(recipe, url);
+            }
+          }
+        } catch (e) {
+          console.log('Failed to parse JSON-LD:', e);
+        }
+      }
+      
+      // Fallback: Try to extract from HTML structure
+      return parseRecipeFromHTML(doc, url);
+    };
+
+    const parseRecipeSchema = (schema, url) => {
+      // Extract ingredients
+      const ingredients = [];
+      if (schema.recipeIngredient) {
+        ingredients.push(...schema.recipeIngredient);
+      } else if (schema.ingredients) {
+        ingredients.push(...(Array.isArray(schema.ingredients) ? schema.ingredients : [schema.ingredients]));
+      }
+
+      // Extract instructions
+      const steps = [];
+      if (schema.recipeInstructions) {
+        const instructions = Array.isArray(schema.recipeInstructions) 
+          ? schema.recipeInstructions 
+          : [schema.recipeInstructions];
+        
+        for (let instruction of instructions) {
+          if (typeof instruction === 'string') {
+            steps.push(instruction);
+          } else if (instruction.text) {
+            steps.push(instruction.text);
+          } else if (instruction['@type'] === 'HowToStep' && instruction.text) {
+            steps.push(instruction.text);
+          } else if (instruction.itemListElement) {
+            // Handle HowToSection
+            instruction.itemListElement.forEach(step => {
+              if (step.text) steps.push(step.text);
+            });
+          }
+        }
+      }
+
+      // Determine category
+      const category = determineCategory(schema.name || '', schema.recipeCategory || '');
+
+      // Get source name from URL
+      const sourceName = new URL(url).hostname.replace('www.', '').split('.')[0];
+      const formattedSource = sourceName.charAt(0).toUpperCase() + sourceName.slice(1);
+
+      return {
+        title: schema.name || 'Unknown Recipe',
+        sourceUrl: url,
+        sourceName: formattedSource,
+        servings: schema.recipeYield || schema.yield || 'N/A',
+        time: formatTime(schema.totalTime) || formatTime(schema.cookTime) || 'N/A',
+        category: category,
+        ingredients: ingredients.slice(0, 20), // Limit to 20 ingredients
+        steps: steps.slice(0, 15) // Limit to 15 steps
+      };
+    };
+
+    const parseRecipeFromHTML = (doc, url) => {
+      // Fallback HTML parsing for sites without JSON-LD
+      const title = doc.querySelector('h1')?.textContent?.trim() || 
+                   doc.querySelector('title')?.textContent?.split('|')[0]?.trim() || 
+                   'Recipe';
+
+      // Try to find ingredients
+      const ingredients = [];
+      const ingredientSelectors = [
+        '.ingredient',
+        '.recipe-ingredient',
+        '[itemprop="recipeIngredient"]',
+        'li[class*="ingredient"]',
+        'ul[class*="ingredient"] li'
+      ];
+
+      for (let selector of ingredientSelectors) {
+        const elements = doc.querySelectorAll(selector);
+        if (elements.length > 0) {
+          elements.forEach(el => {
+            const text = el.textContent.trim();
+            if (text && text.length > 2 && text.length < 200) {
+              ingredients.push(text);
+            }
+          });
+          if (ingredients.length > 0) break;
+        }
+      }
+
+      // Try to find steps
+      const steps = [];
+      const stepSelectors = [
+        '.instruction',
+        '.recipe-instruction',
+        '[itemprop="recipeInstructions"]',
+        'li[class*="instruction"]',
+        'ol[class*="instruction"] li',
+        '.step'
+      ];
+
+      for (let selector of stepSelectors) {
+        const elements = doc.querySelectorAll(selector);
+        if (elements.length > 0) {
+          elements.forEach(el => {
+            const text = el.textContent.trim();
+            if (text && text.length > 10 && text.length < 1000) {
+              steps.push(text);
+            }
+          });
+          if (steps.length > 0) break;
+        }
+      }
+
+      const sourceName = new URL(url).hostname.replace('www.', '').split('.')[0];
+      const formattedSource = sourceName.charAt(0).toUpperCase() + sourceName.slice(1);
+
+      if (ingredients.length === 0 || steps.length === 0) {
+        throw new Error('Could not find recipe data on this page');
+      }
+
+      return {
+        title: title,
+        sourceUrl: url,
+        sourceName: formattedSource,
+        servings: 'N/A',
+        time: 'N/A',
+        category: determineCategory(title, ''),
+        ingredients: ingredients.slice(0, 20),
+        steps: steps.slice(0, 15)
+      };
+    };
+
+    const determineCategory = (title, recipeCategory) => {
+      const text = (title + ' ' + recipeCategory).toLowerCase();
+      
+      if (text.includes('chicken')) return 'Chicken';
+      if (text.includes('pasta') || text.includes('spaghetti') || text.includes('noodle')) return 'Pasta';
+      if (text.includes('fish') || text.includes('salmon') || text.includes('shrimp') || text.includes('seafood')) return 'Seafood';
+      if (text.includes('asian') || text.includes('chinese') || text.includes('thai') || text.includes('vietnamese')) return 'Asian';
+      if (text.includes('mexican') || text.includes('taco') || text.includes('burrito')) return 'Mexican';
+      if (text.includes('soup') || text.includes('stew')) return 'Soup';
+      if (text.includes('vegetarian') || text.includes('vegan')) return 'Vegetarian';
+      if (text.includes('dessert') || text.includes('cake') || text.includes('cookie')) return 'Dessert';
+      
+      return 'Other';
+    };
+
+    const formatTime = (duration) => {
+      if (!duration) return null;
+      
+      // Parse ISO 8601 duration (PT30M = 30 minutes, PT1H30M = 1 hour 30 minutes)
+      const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+      if (match) {
+        const hours = parseInt(match[1]) || 0;
+        const minutes = parseInt(match[2]) || 0;
+        
+        if (hours && minutes) return `${hours}h ${minutes}m`;
+        if (hours) return `${hours} hour${hours > 1 ? 's' : ''}`;
+        if (minutes) return `${minutes} minutes`;
+      }
+      
+      return duration;
+    };
+
+    // Pre-populated curated recipes (same as before)
     const CURATED_RECIPES = [
       {
         title: "Honey Garlic Chicken",
@@ -197,150 +388,6 @@
         ]
       },
       {
-        title: "Sheet Pan Sweet and Sour Chicken",
-        sourceUrl: "https://www.budgetbytes.com/sheet-pan-sweet-sour-chicken/",
-        sourceName: "Budget Bytes",
-        servings: "4 servings",
-        time: "40 minutes",
-        category: "Asian",
-        ingredients: [
-          "1 lb chicken breast, cubed",
-          "1 tsp garlic powder",
-          "1 bell pepper, chopped",
-          "1 onion, chopped",
-          "1 can pineapple chunks",
-          "1/4 cup ketchup",
-          "2 tbsp brown sugar",
-          "2 tbsp rice vinegar"
-        ],
-        steps: [
-          "Preheat oven to 400°F. Cut chicken, bell peppers, and onion into 1-inch pieces.",
-          "Toss chicken with oil, garlic powder, ginger, salt and pepper.",
-          "Spread chicken, vegetables, and drained pineapple on a sheet pan.",
-          "Roast for 20-25 minutes until chicken is cooked through.",
-          "Mix ketchup, brown sugar, vinegar, and reserved pineapple juice. Pour over roasted chicken and vegetables, stir and serve."
-        ]
-      },
-      {
-        title: "One Pan Lemon Garlic Salmon",
-        sourceUrl: "https://damndelicious.net/2019/05/25/one-pan-lemon-garlic-baked-salmon-asparagus/",
-        sourceName: "Damn Delicious",
-        servings: "4 servings",
-        time: "25 minutes",
-        category: "Seafood",
-        ingredients: [
-          "4 salmon fillets",
-          "1 lb asparagus, trimmed",
-          "3 tbsp butter, melted",
-          "3 garlic cloves, minced",
-          "2 tbsp lemon juice",
-          "1 lemon, sliced",
-          "Fresh dill"
-        ],
-        steps: [
-          "Preheat oven to 400°F. Line a baking sheet with foil.",
-          "Place salmon and asparagus on the prepared baking sheet.",
-          "Mix melted butter, garlic, lemon juice, salt and pepper.",
-          "Pour butter mixture over salmon and asparagus. Top with lemon slices.",
-          "Bake 12-15 minutes until salmon is cooked through. Garnish with dill."
-        ]
-      },
-      {
-        title: "Garlic Butter Shrimp Pasta",
-        sourceUrl: "https://damndelicious.net/2018/02/17/garlic-butter-shrimp-pasta/",
-        sourceName: "Damn Delicious",
-        servings: "4 servings",
-        time: "20 minutes",
-        category: "Pasta",
-        ingredients: [
-          "8 oz linguine",
-          "1 lb shrimp, peeled and deveined",
-          "4 tbsp butter",
-          "4 garlic cloves, minced",
-          "1/2 cup white wine",
-          "1/4 cup parsley, chopped",
-          "Parmesan cheese"
-        ],
-        steps: [
-          "Cook linguine according to package directions. Reserve 1/2 cup pasta water.",
-          "Melt 2 tbsp butter in a large skillet. Add shrimp and cook 2-3 minutes per side.",
-          "Remove shrimp and set aside. Add remaining butter and garlic to skillet.",
-          "Add white wine and pasta water. Simmer for 2 minutes.",
-          "Add cooked pasta and shrimp back to skillet. Toss to coat. Top with parsley and Parmesan."
-        ]
-      },
-      {
-        title: "Crispy Parmesan Garlic Chicken",
-        sourceUrl: "https://damndelicious.net/2014/11/15/crispy-garlic-parmesan-chicken-strips/",
-        sourceName: "Damn Delicious",
-        servings: "4 servings",
-        time: "30 minutes",
-        category: "Chicken",
-        ingredients: [
-          "1 lb chicken tenders",
-          "1 cup panko breadcrumbs",
-          "1/2 cup Parmesan cheese, grated",
-          "4 garlic cloves, minced",
-          "1/2 cup flour",
-          "2 eggs, beaten",
-          "2 tbsp butter, melted"
-        ],
-        steps: [
-          "Preheat oven to 400°F. Line a baking sheet with parchment paper.",
-          "Mix panko, Parmesan, garlic, salt and pepper in a bowl.",
-          "Dredge chicken in flour, dip in beaten eggs, then coat in panko mixture.",
-          "Place on baking sheet and drizzle with melted butter.",
-          "Bake 20-25 minutes until golden brown and cooked through."
-        ]
-      },
-      {
-        title: "Marcella Hazan's Tomato Sauce",
-        sourceUrl: "https://food52.com/recipes/13722-marcella-hazan-s-tomato-sauce-with-onion-and-butter",
-        sourceName: "Food52",
-        servings: "4 servings",
-        time: "45 minutes",
-        category: "Pasta",
-        ingredients: [
-          "2 cups canned tomatoes, crushed",
-          "5 tbsp butter",
-          "1 onion, peeled and cut in half",
-          "Salt to taste",
-          "Pasta of choice"
-        ],
-        steps: [
-          "Combine tomatoes, butter, onion halves, and salt in a saucepan.",
-          "Bring to a simmer over medium heat.",
-          "Cook uncovered for about 45 minutes, stirring occasionally.",
-          "Remove and discard onion halves.",
-          "Toss with cooked pasta and serve immediately."
-        ]
-      },
-      {
-        title: "West African Peanut Stew",
-        sourceUrl: "https://food52.com/recipes/87231-west-african-peanut-stew-recipe",
-        sourceName: "Food52",
-        servings: "6 servings",
-        time: "45 minutes",
-        category: "Soup",
-        ingredients: [
-          "1 onion, diced",
-          "3 garlic cloves, minced",
-          "1 tbsp ginger, minced",
-          "1 can diced tomatoes",
-          "1/2 cup peanut butter",
-          "4 cups vegetable broth",
-          "1 sweet potato, cubed",
-          "1 bunch kale, chopped"
-        ],
-        steps: [
-          "Sauté onion in oil until softened. Add garlic and ginger, cook 1 minute.",
-          "Add tomatoes and cook for 5 minutes.",
-          "Stir in peanut butter until melted and combined.",
-          "Add broth, sweet potato, and seasonings. Simmer 15-20 minutes until potato is tender.",
-          "Add kale and cook until wilted. Serve over rice."
-        ]
-      },
-      {
         title: "Cacio e Pepe",
         sourceUrl: "https://www.seriouseats.com/cacio-e-pepe-recipe",
         sourceName: "Serious Eats",
@@ -384,7 +431,6 @@
         if (urlParam) {
           setUrl(decodeURIComponent(urlParam));
           setView('add');
-          // Auto-extract if URL is provided
           setTimeout(() => {
             fetchRecipe(decodeURIComponent(urlParam));
           }, 500);
@@ -409,112 +455,24 @@
         setError('');
 
         try {
-          const response = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'claude-sonnet-4-20250514',
-              max_tokens: 4000,
-              tools: [{
-                type: "web_search_20250305",
-                name: "web_search"
-              }],
-              messages: [{
-                role: 'user',
-                content: `Please use your web search tools to fetch and read the complete content from this URL: ${recipeUrl}
-
-After you have fetched and read the webpage, extract the recipe information and return ONLY a valid JSON object. Do not include any markdown formatting, no code blocks, no explanatory text before or after - ONLY the raw JSON object.
-
-Return this exact structure:
-{
-  "title": "recipe title",
-  "sourceUrl": "${recipeUrl}",
-  "sourceName": "website name (e.g., 'Serious Eats', 'Budget Bytes')",
-  "servings": "number of servings (e.g., '4 servings')",
-  "time": "total time (e.g., '30 minutes', '1 hour')",
-  "category": "ONE of these: Chicken, Pasta, Seafood, Asian, Mexican, Soup, Vegetarian, Dessert, or Other",
-  "ingredients": ["brief ingredient 1", "brief ingredient 2", "..."],
-  "steps": ["brief step 1", "brief step 2", "..."]
-}
-
-CRITICAL RULES:
-1. First fetch the URL to get the recipe content
-2. Extract ONLY brief snippets - keep ingredients under 10 words, steps 1-2 sentences max
-3. Return ONLY the JSON object - no preamble, no markdown code blocks, no explanation
-4. If you cannot access the URL or extract the recipe, return: {"error": "Could not extract recipe from this URL"}
-
-Start by fetching the URL, then return ONLY the JSON object:`
-              }]
-            })
-          });
-
+          console.log('Fetching recipe from:', recipeUrl);
+          
+          // Fetch the page HTML through CORS proxy
+          const response = await fetch(CORS_PROXY + encodeURIComponent(recipeUrl));
+          
           if (!response.ok) {
-            throw new Error('Failed to fetch recipe');
+            throw new Error('Failed to fetch the webpage. The site may be down or blocking access.');
           }
 
-          const data = await response.json();
+          const html = await response.text();
+          console.log('Received HTML, length:', html.length);
           
-          console.log('API Response:', data);
-          
-          // Extract text from response (filter out tool use blocks)
-          const text = data.content
-            .filter(item => item.type === 'text')
-            .map(item => item.text)
-            .join('\n');
+          // Extract recipe from HTML
+          const recipeData = extractRecipeFromHTML(html, recipeUrl);
+          console.log('Extracted recipe:', recipeData);
 
-          console.log('Extracted text:', text);
-
-          // Try to find and parse JSON with multiple strategies
-          let recipeData;
-          let parseAttempts = [
-            // Strategy 1: Remove markdown and parse
-            () => {
-              const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-              return JSON.parse(cleanText);
-            },
-            // Strategy 2: Find JSON object with regex
-            () => {
-              const jsonMatch = text.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                return JSON.parse(jsonMatch[0]);
-              }
-              throw new Error('No JSON found');
-            },
-            // Strategy 3: Find JSON between curly braces (greedy)
-            () => {
-              const firstBrace = text.indexOf('{');
-              const lastBrace = text.lastIndexOf('}');
-              if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-                return JSON.parse(text.substring(firstBrace, lastBrace + 1));
-              }
-              throw new Error('No JSON found');
-            }
-          ];
-
-          for (let attempt of parseAttempts) {
-            try {
-              recipeData = attempt();
-              break;
-            } catch (e) {
-              continue;
-            }
-          }
-
-          if (!recipeData) {
-            const preview = text.substring(0, 200);
-            console.error('Failed to parse response:', text);
-            throw new Error(`Could not parse recipe data. Response preview: "${preview}..."`);
-          }
-          
-          if (recipeData.error) {
-            throw new Error(recipeData.error);
-          }
-
-          // Validate required fields
           if (!recipeData.title || !recipeData.ingredients || !recipeData.steps) {
-            throw new Error('Recipe is missing required information (title, ingredients, or steps).');
+            throw new Error('Could not find recipe data on this page');
           }
 
           // Add to user recipes
@@ -531,13 +489,8 @@ Start by fetching the URL, then return ONLY the JSON object:`
           console.error('Recipe fetch error:', err);
           let errorMessage = err.message || 'Failed to fetch recipe. Please check the URL and try again.';
           
-          // Provide more helpful error messages based on error type
-          if (errorMessage.includes('Could not extract recipe from this URL')) {
-            errorMessage = '⚠️ Could not extract recipe from this URL. This may mean:\n\n• The site blocks automated access (common for Serious Eats, NYT Cooking, etc.)\n• The page doesn\'t contain a recipe in a recognizable format\n• The recipe structure is unusual\n\n✅ Try recipes from: RecipeTin Eats, Budget Bytes, Damn Delicious, Food52, AllRecipes, or most other food blogs.';
-          } else if (errorMessage.includes('Could not parse')) {
-            errorMessage += '\n\nThe website may have an unusual format. Try a recipe from RecipeTin Eats, Budget Bytes, or Damn Delicious.';
-          } else if (errorMessage.includes('Failed to fetch')) {
-            errorMessage = 'Could not access the website. The site may be down or blocking automated access. Try a different recipe URL.';
+          if (errorMessage.includes('Could not find recipe data')) {
+            errorMessage = '⚠️ Could not find recipe data on this page.\n\nThis could mean:\n• The page doesn\'t have structured recipe data\n• The recipe format is unusual\n• The page is not a recipe\n\n✅ Works best with: RecipeTin Eats, Budget Bytes, AllRecipes, Food Network, Bon Appétit, and most modern recipe blogs.';
           }
           
           setError(errorMessage);
@@ -950,7 +903,7 @@ Start by fetching the URL, then return ONLY the JSON object:`
                     color: '#666',
                     fontFamily: "'Work Sans', sans-serif"
                   }}>
-                    Paste a recipe URL from any website. Claude will fetch the page and extract the ingredients and steps for you. This may take 10-20 seconds.
+                    Paste a recipe URL from any website. We'll automatically extract the ingredients and steps (no AI needed - instant results!).
                   </p>
 
                   <div style={{
@@ -1037,9 +990,11 @@ Start by fetching the URL, then return ONLY the JSON object:`
                     fontFamily: "'Work Sans', sans-serif",
                     lineHeight: '1.6'
                   }}>
-                    <strong style={{ color: '#2c1810' }}>✅ Works well with:</strong> RecipeTin Eats, Budget Bytes, Damn Delicious, Food52, AllRecipes, Sally's Baking Addiction, Minimalist Baker, and most food blogs.
+                    <strong style={{ color: '#2c1810' }}>✅ How it works:</strong> We extract recipes using structured data (JSON-LD/Schema.org) that most recipe sites include. No AI, no API costs, instant results!
                     <br/><br/>
-                    <strong style={{ color: '#c33' }}>❌ May not work:</strong> Some sites like Serious Eats, NYT Cooking, Bon Appétit block automated access for copyright protection.
+                    <strong style={{ color: '#2c1810' }}>✅ Works with:</strong> RecipeTin Eats, Budget Bytes, AllRecipes, Food Network, Bon Appétit, Serious Eats, and 99% of modern recipe blogs.
+                    <br/><br/>
+                    <strong style={{ color: '#2c1810' }}>🔒 Privacy:</strong> Everything happens in your browser. No data is sent to any servers.
                   </div>
                 </div>
 
@@ -1353,13 +1308,13 @@ Start by fetching the URL, then return ONLY the JSON object:`
             fontFamily: "'Work Sans', sans-serif"
           }}>
             <p style={{ margin: '0 0 0.5rem 0' }}>
-              Recipe Essentials features curated recipes and lets you add your own from any website.
+              Recipe Essentials extracts recipes using structured data - no AI, no servers, 100% free.
             </p>
             <p style={{ margin: '0 0 0.5rem 0' }}>
               We provide snippets only and always link to the source to support recipe creators.
             </p>
             <p style={{ margin: 0 }}>
-              Featured recipes from RecipeTin Eats • Budget Bytes • Damn Delicious • Food52 • Serious Eats
+              Featured recipes from RecipeTin Eats • Budget Bytes • Serious Eats
             </p>
           </footer>
         </div>
